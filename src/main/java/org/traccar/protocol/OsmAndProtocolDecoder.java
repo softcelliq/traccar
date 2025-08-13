@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonValue;
 import org.traccar.BaseHttpProtocolDecoder;
@@ -41,6 +42,7 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -219,8 +221,13 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
     private Object decodeJson(
             Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
         String content = request.content().toString(StandardCharsets.UTF_8);
-        return decodeJsonObject(channel, remoteAddress, request);
+        JsonValue value = Json.createReader(new StringReader(content)).readValue();
 
+        if (value.getValueType() == JsonValue.ValueType.ARRAY) {
+            return decodeJsonArray(channel, remoteAddress, request);
+        } else {
+            return decodeJsonObject(channel, remoteAddress, request);
+        }
 
     }
 
@@ -300,6 +307,102 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
         sendResponse(channel, HttpResponseStatus.OK);
         return position;
+    }
+
+    private List<Position> decodeJsonArray(
+            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
+        String content = request.content().toString(StandardCharsets.UTF_8);
+        JsonArray arrayRoot = Json.createReader(new StringReader(content)).readArray();
+
+        List<Position> positions = new ArrayList<>();
+        for (JsonValue element : arrayRoot) {
+            if (element.getValueType() != JsonValue.ValueType.OBJECT) {
+                continue;
+            }
+            JsonObject root = element.asJsonObject();
+
+            if (!root.containsKey("device_id")) {
+                continue;
+            }
+            DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
+            if (deviceSession == null) {
+                continue;
+            }
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+
+            JsonObject location = root.getJsonObject("location");
+
+            position.setTime(DateUtil.parseDate(location.getString("timestamp")));
+
+            if (location.containsKey("coords")) {
+                JsonObject coordinates = location.getJsonObject("coords");
+                position.setValid(true);
+                position.setLatitude(coordinates.getJsonNumber("latitude").doubleValue());
+                position.setLongitude(coordinates.getJsonNumber("longitude").doubleValue());
+                double speed = coordinates.getJsonNumber("speed").doubleValue();
+                if (speed >= 0) {
+                    position.setSpeed(UnitsConverter.knotsFromMps(speed));
+                }
+                double heading = coordinates.getJsonNumber("heading").doubleValue();
+                if (heading >= 0) {
+                    position.setCourse(heading);
+                }
+                if (speed >= 0 || heading >= 0) {
+                    position.setAccuracy(coordinates.getJsonNumber("accuracy").doubleValue());
+                }
+                position.setAltitude(coordinates.getJsonNumber("altitude").doubleValue());
+            } else {
+                getLastLocation(position, null);
+            }
+
+            if (location.containsKey("event")) {
+                position.set(Position.KEY_EVENT, location.getString("event"));
+            }
+            if (location.containsKey("is_moving")) {
+                position.set(Position.KEY_MOTION, location.getBoolean("is_moving"));
+            }
+            if (location.containsKey("odometer")) {
+                position.set(Position.KEY_ODOMETER, location.getInt("odometer"));
+            }
+            if (location.containsKey("mock")) {
+                position.set("mock", location.getBoolean("mock"));
+            }
+            if (location.containsKey("activity")) {
+                position.set("activity", location.getJsonObject("activity").getString("type"));
+            }
+            if (location.containsKey("battery")) {
+                JsonObject battery = location.getJsonObject("battery");
+                double level = battery.getJsonNumber("level").doubleValue();
+                if (level >= 0) {
+                    position.set(Position.KEY_BATTERY_LEVEL, (int) (level * 100));
+                }
+                if (battery.getBoolean("is_charging")) {
+                    position.set(Position.KEY_CHARGE, true);
+                }
+            }
+
+            if (location.containsKey("alarm")) {
+                position.set(Position.KEY_ALARM, location.getString("alarm"));
+            } else if (location.containsKey("extras")) {
+                JsonObject extras = location.getJsonObject("extras");
+                if (extras.containsKey("alarm")) {
+                    position.set(Position.KEY_ALARM, extras.getString("alarm"));
+                }
+            }
+
+            positions.add(position);
+        }
+
+
+        if (positions.isEmpty()) {
+            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
+            return null;
+        } else {
+            sendResponse(channel, HttpResponseStatus.OK);
+            return positions;
+        }
     }
 
     @Override
