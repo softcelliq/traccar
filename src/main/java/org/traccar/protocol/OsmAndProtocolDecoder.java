@@ -226,15 +226,21 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         if (value.getValueType() == JsonValue.ValueType.ARRAY) {
             return decodeJsonArray(channel, remoteAddress, request);
         } else {
-            return decodeJsonObject(channel, remoteAddress, request);
+            return decodeJsonObject(channel, remoteAddress, request, null);
         }
 
     }
 
-    private Position decodeJsonObject(Channel channel, SocketAddress remoteAddress, FullHttpRequest request) {
+    private Position decodeJsonObject(Channel channel, SocketAddress remoteAddress, FullHttpRequest request, JsonObject root) {
 
-        String content = request.content().toString(StandardCharsets.UTF_8);
-        JsonObject root = Json.createReader(new StringReader(content)).readObject();
+        boolean canRespond = false;
+
+        if(root == null) {
+            String content = request.content().toString(StandardCharsets.UTF_8);
+            root = Json.createReader(new StringReader(content)).readObject();
+            canRespond = true;
+        }
+
 
         DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
         if (deviceSession == null) {
@@ -305,7 +311,8 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             }
         }
 
-        sendResponse(channel, HttpResponseStatus.OK);
+        if (canRespond) sendResponse(channel, HttpResponseStatus.OK);
+
         return position;
     }
 
@@ -315,84 +322,21 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         JsonArray arrayRoot = Json.createReader(new StringReader(content)).readArray();
 
         List<Position> positions = new ArrayList<>();
+
         for (JsonValue element : arrayRoot) {
             if (element.getValueType() != JsonValue.ValueType.OBJECT) {
                 continue;
             }
+
             JsonObject root = element.asJsonObject();
 
             if (!root.containsKey("device_id")) {
                 continue;
             }
-            DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
-            if (deviceSession == null) {
-                continue;
-            }
 
-            Position position = new Position(getProtocolName());
-            position.setDeviceId(deviceSession.getDeviceId());
+            Position position = decodeJsonObject(channel, remoteAddress, request, root);
 
-            JsonObject location = root.getJsonObject("location");
-
-            position.setTime(DateUtil.parseDate(location.getString("timestamp")));
-
-            if (location.containsKey("coords")) {
-                JsonObject coordinates = location.getJsonObject("coords");
-                position.setValid(true);
-                position.setLatitude(coordinates.getJsonNumber("latitude").doubleValue());
-                position.setLongitude(coordinates.getJsonNumber("longitude").doubleValue());
-                double speed = coordinates.getJsonNumber("speed").doubleValue();
-                if (speed >= 0) {
-                    position.setSpeed(UnitsConverter.knotsFromMps(speed));
-                }
-                double heading = coordinates.getJsonNumber("heading").doubleValue();
-                if (heading >= 0) {
-                    position.setCourse(heading);
-                }
-                if (speed >= 0 || heading >= 0) {
-                    position.setAccuracy(coordinates.getJsonNumber("accuracy").doubleValue());
-                }
-                position.setAltitude(coordinates.getJsonNumber("altitude").doubleValue());
-            } else {
-                getLastLocation(position, null);
-            }
-
-            if (location.containsKey("event")) {
-                position.set(Position.KEY_EVENT, location.getString("event"));
-            }
-            if (location.containsKey("is_moving")) {
-                position.set(Position.KEY_MOTION, location.getBoolean("is_moving"));
-            }
-            if (location.containsKey("odometer")) {
-                position.set(Position.KEY_ODOMETER, location.getInt("odometer"));
-            }
-            if (location.containsKey("mock")) {
-                position.set("mock", location.getBoolean("mock"));
-            }
-            if (location.containsKey("activity")) {
-                position.set("activity", location.getJsonObject("activity").getString("type"));
-            }
-            if (location.containsKey("battery")) {
-                JsonObject battery = location.getJsonObject("battery");
-                double level = battery.getJsonNumber("level").doubleValue();
-                if (level >= 0) {
-                    position.set(Position.KEY_BATTERY_LEVEL, (int) (level * 100));
-                }
-                if (battery.getBoolean("is_charging")) {
-                    position.set(Position.KEY_CHARGE, true);
-                }
-            }
-
-            if (location.containsKey("alarm")) {
-                position.set(Position.KEY_ALARM, location.getString("alarm"));
-            } else if (location.containsKey("extras")) {
-                JsonObject extras = location.getJsonObject("extras");
-                if (extras.containsKey("alarm")) {
-                    position.set(Position.KEY_ALARM, extras.getString("alarm"));
-                }
-            }
-
-            positions.add(position);
+            if (position != null) positions.add(position);
         }
 
 
