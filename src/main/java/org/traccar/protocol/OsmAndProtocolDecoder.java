@@ -231,11 +231,12 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
     }
 
-    private Position decodeJsonObject(Channel channel, SocketAddress remoteAddress, FullHttpRequest request, JsonObject root) {
+    private Position decodeJsonObject(
+            Channel channel, SocketAddress remoteAddress, FullHttpRequest request, JsonObject root) {
 
         boolean canRespond = false;
 
-        if(root == null) {
+        if (root == null) {
             String content = request.content().toString(StandardCharsets.UTF_8);
             root = Json.createReader(new StringReader(content)).readObject();
             canRespond = true;
@@ -311,7 +312,9 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             }
         }
 
-        if (canRespond) sendResponse(channel, HttpResponseStatus.OK);
+        if (canRespond) {
+            sendResponse(channel, HttpResponseStatus.OK);
+        }
 
         return position;
     }
@@ -336,7 +339,9 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
             Position position = decodeJsonObject(channel, remoteAddress, request, root);
 
-            if (position != null) positions.add(position);
+            if (position != null) {
+                positions.add(position);
+            }
         }
 
 
