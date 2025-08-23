@@ -1,5 +1,6 @@
 package org.traccar.protocol;
 
+import com.google.api.Http;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.ReadOnlyHttpHeaders;
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,7 @@ import org.traccar.ProtocolTest;
 public class OsmAndProtocolDecoderTest extends ProtocolTest {
 
     @Test
-    public void testDecodeJson() throws Exception {
+    public void testDecodeLocationJson() throws Exception {
 
         var decoder = inject(new OsmAndProtocolDecoder(null));
 
@@ -21,6 +22,47 @@ public class OsmAndProtocolDecoderTest extends ProtocolTest {
         verifyPosition(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
                 "{\"location\":{\"event\":\"motionchange\",\"is_moving\":false,\"uuid\":\"0e9a2473-a9a7-4c00-997b-fb97d2154e75\",\"timestamp\":\"2021-07-21T08:06:34.444Z\",\"odometer\":0,\"coords\":{\"latitude\":-6.1148096,\"longitude\":106.6837015,\"accuracy\":3.8,\"speed\":18.67,\"speed_accuracy\":0.26,\"heading\":63,\"heading_accuracy\":0.28,\"altitude\":35.7,\"altitude_accuracy\":3.8},\"activity\":{\"type\":\"still\",\"confidence\":100},\"battery\":{\"is_charging\":false,\"level\":0.79},\"extras\":{}},\"device_id\":\"8737767034\"}")));
 
+    }
+
+    @Test
+    public void testDecodeLocationsJson() throws Exception {
+        var decoder = inject(new OsmAndProtocolDecoder(null));
+        String body = """
+                {
+                    "device_id": "658765",
+                    "locations": [
+                        {
+                      "timestamp": "2025-08-13T07:00:00Z",
+                      "coords": {
+                        "latitude": 33.3152,
+                        "longitude": 44.3661,
+                        "accuracy": 12,
+                        "speed": 0,
+                        "heading": 0,
+                        "altitude": 33
+                      },
+                      "is_moving": false,
+                      "odometer": 0,
+                      "battery": { "level": 0.92, "is_charging": false }
+                    },
+                    {
+                      "timestamp": "2025-08-13T07:02:00Z",
+                      "coords": {
+                        "latitude": 33.3160,
+                        "longitude": 44.3669,
+                        "accuracy": 9,
+                        "speed": 1.3,
+                        "heading": 45,
+                        "altitude": 34
+                      },
+                      "is_moving": true,
+                      "odometer": 120,
+                      "battery": { "level": 0.91, "is_charging": false }
+                    }
+                    ]
+                  }
+                """;
+        verifyPositions(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(body)));
     }
 
     @Test
@@ -42,13 +84,13 @@ public class OsmAndProtocolDecoderTest extends ProtocolTest {
 
         verifyPosition(decoder, request(
                 "/?lat=49.60688&lon=6.15788&timestamp=2014-06-04+09%3A10%3A11&altitude=384.7&speed=0.0&id=353861053849681"));
-        
+
         verifyPosition(decoder, request(
                 "/?id=123456&timestamp=1377177267&lat=60.0&lon=30.0&speed=0.0&bearing=0.0&altitude=0&hdop=0.0"));
-        
+
         verifyPosition(decoder, request(
                 "/?id=123456&timestamp=1377177267&lat=60.0&lon=30.0"));
-        
+
         verifyPosition(decoder, request(
                 "/?lat=60.0&lon=30.0&speed=0.0&heading=0.0&vacc=0&hacc=0&altitude=0&deviceid=123456"));
 
