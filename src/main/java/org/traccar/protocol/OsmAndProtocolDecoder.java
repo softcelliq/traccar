@@ -25,7 +25,6 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
-import jakarta.json.JsonValue;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.session.DeviceSession;
@@ -278,7 +277,7 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-    private List<Position> decodeJson(
+    private Object decodeJson(
             Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
 
         String content = request.content().toString(StandardCharsets.UTF_8);
@@ -295,7 +294,6 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         JsonObject decodedLocation = root.getJsonObject("location");
         JsonArray decodedLocations = root.getJsonArray("locations");
 
-        List<Position> positions = new ArrayList<>();
 
         if (decodedLocations != null && decodedLocation != null) {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
@@ -304,10 +302,12 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
             setLocation(position, decodedLocation);
-            positions.add(position);
+            sendResponse(channel, HttpResponseStatus.OK);
+            return position;
         } else if (decodedLocations != null) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
+            List<Position> positions = new ArrayList<>();
             decodedLocations.forEach(element -> {
                 if (element instanceof JsonObject) {
                     JsonObject location = (JsonObject) element;
@@ -315,6 +315,14 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                     positions.add(position);
                 }
             });
+
+            if(positions.isEmpty()) {
+                sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+                return null;
+            }
+
+            sendResponse(channel, HttpResponseStatus.OK);
+            return positions;
         } else {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
             return null;
@@ -323,13 +331,6 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
 
 
-        if(positions.isEmpty()) {
-            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
-            return null;
-        }
-
-        sendResponse(channel, HttpResponseStatus.OK);
-        return positions;
     }
 
     @Override
