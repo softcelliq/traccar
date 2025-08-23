@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.helper.UnitsConverter;
@@ -40,6 +41,7 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -275,7 +277,6 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-
     private Object decodeJson(
             Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
 
@@ -288,17 +289,48 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             return null;
         }
 
-        Position position = new Position(getProtocolName());
-        position.setDeviceId(deviceSession.getDeviceId());
 
-        JsonObject location = root.getJsonObject("location");
 
-        position.setTime(DateUtil.parseDate(location.getString("timestamp")));
+        JsonObject decodedLocation = root.getJsonObject("location");
+        JsonArray decodedLocations = root.getJsonArray("locations");
 
-        setLocation(position, location);
 
-        sendResponse(channel, HttpResponseStatus.OK);
-        return position;
+        if (decodedLocations != null && decodedLocation != null) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        } else if (decodedLocation != null) {
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            setLocation(position, decodedLocation);
+            sendResponse(channel, HttpResponseStatus.OK);
+            return position;
+        } else if (decodedLocations != null) {
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            List<Position> positions = new ArrayList<>();
+            decodedLocations.forEach(element -> {
+                if (element instanceof JsonObject) {
+                    JsonObject location = (JsonObject) element;
+                    setLocation(position, location);
+                    positions.add(position);
+                }
+            });
+
+            if(positions.isEmpty()) {
+                sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+                return null;
+            }
+
+            sendResponse(channel, HttpResponseStatus.OK);
+            return positions;
+        } else {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        }
+
+
+
+
     }
 
     @Override
@@ -306,3 +338,4 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
     }
 
 }
+
