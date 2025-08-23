@@ -23,7 +23,9 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+import jakarta.json.JsonValue;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.session.DeviceSession;
@@ -40,6 +42,7 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -215,23 +218,7 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-    private Object decodeJson(
-            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
-
-        String content = request.content().toString(StandardCharsets.UTF_8);
-        JsonObject root = Json.createReader(new StringReader(content)).readObject();
-
-        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
-        if (deviceSession == null) {
-            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
-            return null;
-        }
-
-        Position position = new Position(getProtocolName());
-        position.setDeviceId(deviceSession.getDeviceId());
-
-        JsonObject location = root.getJsonObject("location");
-
+    private void setLocation(Position position, JsonObject location) {
         position.setTime(DateUtil.parseDate(location.getString("timestamp")));
 
         if (location.containsKey("coords")) {
@@ -289,9 +276,60 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                 position.set(Position.KEY_ALARM, extras.getString("alarm"));
             }
         }
+    }
+
+    private List<Position> decodeJson(
+            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
+
+        String content = request.content().toString(StandardCharsets.UTF_8);
+        JsonObject root = Json.createReader(new StringReader(content)).readObject();
+
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
+        if (deviceSession == null) {
+            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
+            return null;
+        }
+
+
+
+        JsonObject decodedLocation = root.getJsonObject("location");
+        JsonArray decodedLocations = root.getJsonArray("locations");
+
+        List<Position> positions = new ArrayList<>();
+
+        if (decodedLocations != null && decodedLocation != null) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        } else if (decodedLocation != null) {
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            setLocation(position, decodedLocation);
+            positions.add(position);
+        } else if (decodedLocations != null) {
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            decodedLocations.forEach(element -> {
+                if (element instanceof JsonObject) {
+                    JsonObject location = (JsonObject) element;
+                    setLocation(position, location);
+                    positions.add(position);
+                }
+            });
+        } else {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        }
+
+
+
+
+        if(positions.isEmpty()) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        }
 
         sendResponse(channel, HttpResponseStatus.OK);
-        return position;
+        return positions;
     }
 
     @Override
