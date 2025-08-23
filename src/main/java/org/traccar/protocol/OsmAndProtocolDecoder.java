@@ -215,23 +215,7 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-    private Object decodeJson(
-            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
-
-        String content = request.content().toString(StandardCharsets.UTF_8);
-        JsonObject root = Json.createReader(new StringReader(content)).readObject();
-
-        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
-        if (deviceSession == null) {
-            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
-            return null;
-        }
-
-        Position position = new Position(getProtocolName());
-        position.setDeviceId(deviceSession.getDeviceId());
-
-        JsonObject location = root.getJsonObject("location");
-
+    private void setLocation(Position position, JsonObject location) {
         position.setTime(DateUtil.parseDate(location.getString("timestamp")));
 
         if (location.containsKey("coords")) {
@@ -289,6 +273,29 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                 position.set(Position.KEY_ALARM, extras.getString("alarm"));
             }
         }
+    }
+
+
+    private Object decodeJson(
+            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
+
+        String content = request.content().toString(StandardCharsets.UTF_8);
+        JsonObject root = Json.createReader(new StringReader(content)).readObject();
+
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
+        if (deviceSession == null) {
+            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
+            return null;
+        }
+
+        Position position = new Position(getProtocolName());
+        position.setDeviceId(deviceSession.getDeviceId());
+
+        JsonObject location = root.getJsonObject("location");
+
+        position.setTime(DateUtil.parseDate(location.getString("timestamp")));
+
+        setLocation(position, location);
 
         sendResponse(channel, HttpResponseStatus.OK);
         return position;
