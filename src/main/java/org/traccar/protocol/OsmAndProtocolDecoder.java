@@ -24,7 +24,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
-import jakarta.json.JsonValue;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.session.DeviceSession;
@@ -218,13 +217,6 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
     private Object decodeJson(
             Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
-        String content = request.content().toString(StandardCharsets.UTF_8);
-        return decodeJsonObject(channel, remoteAddress, request);
-
-
-    }
-
-    private Position decodeJsonObject(Channel channel, SocketAddress remoteAddress, FullHttpRequest request) {
 
         String content = request.content().toString(StandardCharsets.UTF_8);
         JsonObject root = Json.createReader(new StringReader(content)).readObject();
