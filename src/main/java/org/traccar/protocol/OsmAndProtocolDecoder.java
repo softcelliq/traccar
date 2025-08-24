@@ -290,28 +290,28 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
 
 
-        JsonObject decodedLocation = root.getJsonObject("location");
-        JsonArray decodedLocations = root.getJsonArray("locations");
+        JsonObject deserializedLocation = root.getJsonObject("location");
+        JsonArray deserializedLocations = root.getJsonArray("locations");
 
 
-        if (decodedLocations != null && decodedLocation != null) {
+        if (deserializedLocations != null && deserializedLocation != null) {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
             return null;
         }
 
-        if (decodedLocation != null) {
+        if (deserializedLocation != null) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
-            setLocation(position, decodedLocation);
+            setLocation(position, deserializedLocation);
             sendResponse(channel, HttpResponseStatus.OK);
             return position;
         }
 
-        if (decodedLocations != null) {
+        if (deserializedLocations != null) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
             List<Position> positions = new ArrayList<>();
-            decodedLocations.forEach(element -> {
+            deserializedLocations.forEach(element -> {
                 if (element instanceof JsonObject) {
                     JsonObject location = (JsonObject) element;
                     setLocation(position, location);
