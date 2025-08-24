@@ -290,7 +290,6 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
 
 
-
         JsonObject decodedLocation = root.getJsonObject("location");
         JsonArray decodedLocations = root.getJsonArray("locations");
 
@@ -298,13 +297,17 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         if (decodedLocations != null && decodedLocation != null) {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
             return null;
-        } else if (decodedLocation != null) {
+        }
+
+        if (decodedLocation != null) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
             setLocation(position, decodedLocation);
             sendResponse(channel, HttpResponseStatus.OK);
             return position;
-        } else if (decodedLocations != null) {
+        }
+
+        if (decodedLocations != null) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
             List<Position> positions = new ArrayList<>();
@@ -312,23 +315,23 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                 if (element instanceof JsonObject) {
                     JsonObject location = (JsonObject) element;
                     setLocation(position, location);
-                    positions.add(position);
+                    if(position.getValid()) {
+                        positions.add(position);
+                    }
                 }
             });
 
-            if(positions.isEmpty()) {
+            if (positions.isEmpty()) {
                 sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
                 return null;
             }
 
             sendResponse(channel, HttpResponseStatus.OK);
             return positions;
-        } else {
-            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
-            return null;
         }
 
-
+        sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+        return null;
 
 
     }
