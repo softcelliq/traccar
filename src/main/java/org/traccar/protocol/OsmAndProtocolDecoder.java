@@ -293,47 +293,43 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         JsonObject deserializedLocation = root.getJsonObject("location");
         JsonArray deserializedLocations = root.getJsonArray("locations");
 
-
-        if (deserializedLocations != null && deserializedLocation != null) {
+        if (deserializedLocation !=  null && deserializedLocations != null) {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
             return null;
         }
 
-        if (deserializedLocation != null) {
-            Position position = new Position(getProtocolName());
-            position.setDeviceId(deviceSession.getDeviceId());
-            setLocation(position, deserializedLocation);
-            sendResponse(channel, HttpResponseStatus.OK);
-            return position;
+        if (deserializedLocation ==  null && deserializedLocations == null) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
         }
 
-        if (deserializedLocations != null) {
 
-            List<Position> positions = new ArrayList<>();
-            deserializedLocations.forEach(element -> {
-                if (element instanceof JsonObject) {
-                    Position position = new Position(getProtocolName());
-                    position.setDeviceId(deviceSession.getDeviceId());
-                    JsonObject location = (JsonObject) element;
-                    setLocation(position, location);
-                    if(position.getValid()) {
-                        positions.add(position);
-                    }
-                }
-            });
+        deserializedLocations = deserializedLocation == null ? deserializedLocations : Json.createArrayBuilder().add(deserializedLocation).build();
 
-            if (positions.isEmpty()) {
-                sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
-                return null;
+        List<Position> positions = new ArrayList<>();
+
+        deserializedLocations.forEach(element -> {
+            if (!(element instanceof JsonObject)) {
+                return;
             }
 
-            sendResponse(channel, HttpResponseStatus.OK);
-            return positions;
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            JsonObject location = (JsonObject) element;
+            setLocation(position, location);
+
+            if (position.getValid()) {
+                positions.add(position);
+            }
+        });
+
+        if (positions.isEmpty()) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
         }
 
-        sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
-        return null;
-
+        sendResponse(channel, HttpResponseStatus.OK);
+        return positions;
 
     }
 
