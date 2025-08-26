@@ -301,13 +301,8 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             return null;
         }
 
-        if (deserializedLocation != null) {
-            Position position = new Position(getProtocolName());
-            position.setDeviceId(deviceSession.getDeviceId());
-            setLocation(position, deserializedLocation);
-            sendResponse(channel, HttpResponseStatus.OK);
-            return position;
-        }
+        deserializedLocations = deserializedLocation == null ? deserializedLocations : Json.createArrayBuilder()
+            .add(deserializedLocation).build();
 
         if (deserializedLocations != null) {
 
