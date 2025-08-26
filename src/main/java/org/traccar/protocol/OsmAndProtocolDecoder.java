@@ -217,7 +217,9 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-    private void setLocation(Position position, JsonObject location) {
+    private void parsePosition(String device_id, JsonObject location)
+        Position position = new Position(getProtocolName());
+        position.setDeviceId(deviceSession.getDeviceId());
         position.setTime(DateUtil.parseDate(location.getString("timestamp")));
 
         if (location.containsKey("coords")) {
