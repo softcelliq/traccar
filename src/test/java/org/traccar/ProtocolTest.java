@@ -26,12 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ProtocolTest extends BaseTest {
 
@@ -155,6 +150,21 @@ public class ProtocolTest extends BaseTest {
         verifyDecodedList(decoder.decode(null, null, object), true, position);
     }
 
+    protected void verifyPositions(BaseProtocolDecoder decoder, boolean checkLocation, Object object, List<Position> positions) throws Exception {
+        Object decodedObject = decoder.decode(null, null, object);
+        assertInstanceOf(List.class, decodedObject, "Decoded object is not a list");
+        List<Position> list =  (List<Position>) decodedObject;
+
+        assertEquals(list.size(), positions.size(), "Positions size and expected size don't match");
+
+        for (int i = 0; i < list.size(); i++) {
+            Position position = list.get(i);
+            Position expected = positions.get(i);
+
+            verifyDecodedPosition(position, true, true, expected);
+        }
+    }
+
     private void verifyDecodedList(Object decodedObject, boolean checkLocation, Position expected) {
 
         assertNotNull(decodedObject, "list is null");
@@ -166,6 +176,7 @@ public class ProtocolTest extends BaseTest {
         }
 
     }
+
 
     private void verifyDecodedPosition(Object decodedObject, boolean checkLocation, boolean checkAttributes, Position expected) {
 
