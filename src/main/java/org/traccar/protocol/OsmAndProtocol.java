@@ -29,12 +29,14 @@ public class OsmAndProtocol extends BaseProtocol {
 
     @Inject
     public OsmAndProtocol(Config config) {
+        int kb = 1024;
+
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
                 pipeline.addLast(new HttpResponseEncoder());
                 pipeline.addLast(new HttpRequestDecoder());
-                pipeline.addLast(new HttpObjectAggregator(16384));
+                pipeline.addLast(new HttpObjectAggregator(200 * kb));
                 pipeline.addLast(new OsmAndProtocolDecoder(OsmAndProtocol.this));
             }
         });
