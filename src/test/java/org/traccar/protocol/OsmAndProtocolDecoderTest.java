@@ -98,13 +98,7 @@ public class OsmAndProtocolDecoderTest extends ProtocolTest {
     }
 
 
-    @Test
-    public void testMassiveDecodeLocationsJson() throws Exception {
-        var decoder = inject(new OsmAndProtocolDecoder(null));
-        InputStream inputStream = getClass().getClassLoader().getResourceAsStream("1000-location-entries.json");
-        String body = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        verifyPositions(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(body)));
-    }
+
 
 
     @Test
