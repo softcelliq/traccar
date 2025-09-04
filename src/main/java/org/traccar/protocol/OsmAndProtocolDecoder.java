@@ -298,12 +298,7 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         JsonObject deserializedLocation = root.getJsonObject("location");
         JsonArray deserializedLocations = root.getJsonArray("locations");
 
-        if (deserializedLocation !=  null && deserializedLocations != null) {
-            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
-            return null;
-        }
-
-        if (deserializedLocation ==  null && deserializedLocations == null) {
+        if ( (deserializedLocation ==  null) == (deserializedLocations == null) ) {
             sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
             return null;
         }
