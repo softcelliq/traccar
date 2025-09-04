@@ -33,7 +33,7 @@ public class OsmAndProtocolDecoderTest extends ProtocolTest {
     }
 
     @Test
-    public void testSimpleDecodeLocationsJson() throws Exception {
+    public void testDecodeJsonArray() throws Exception {
         var decoder = inject(new OsmAndProtocolDecoder(null));
         String body = """
                 {
