@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.helper.UnitsConverter;
@@ -40,6 +41,7 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -215,23 +217,10 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
         }
     }
 
-    private Object decodeJson(
-            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
-
-        String content = request.content().toString(StandardCharsets.UTF_8);
-        JsonObject root = Json.createReader(new StringReader(content)).readObject();
-
-        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
-        if (deviceSession == null) {
-            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
-            return null;
-        }
+    private Position parsePosition(DeviceSession deviceSession, JsonObject location) {
 
         Position position = new Position(getProtocolName());
         position.setDeviceId(deviceSession.getDeviceId());
-
-        JsonObject location = root.getJsonObject("location");
-
         position.setTime(DateUtil.parseDate(location.getString("timestamp")));
 
         if (location.containsKey("coords")) {
@@ -290,8 +279,57 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
             }
         }
 
-        sendResponse(channel, HttpResponseStatus.OK);
         return position;
+    }
+
+    private Object decodeJson(
+            Channel channel, SocketAddress remoteAddress, FullHttpRequest request) throws Exception {
+
+        String content = request.content().toString(StandardCharsets.UTF_8);
+        JsonObject root = Json.createReader(new StringReader(content)).readObject();
+
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, root.getString("device_id"));
+        if (deviceSession == null) {
+            sendResponse(channel, HttpResponseStatus.NOT_FOUND);
+            return null;
+        }
+
+
+        JsonObject deserializedLocation = root.getJsonObject("location");
+        JsonArray deserializedLocations = root.getJsonArray("locations");
+
+        if ( (deserializedLocation ==  null) == (deserializedLocations == null) ) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        }
+
+
+        deserializedLocations = deserializedLocation == null ? deserializedLocations : Json.createArrayBuilder().add(deserializedLocation).build();
+
+        List<Position> positions = new ArrayList<>();
+
+        deserializedLocations.forEach(element -> {
+            if (!(element instanceof JsonObject)) {
+                return;
+            }
+
+
+            JsonObject location = (JsonObject) element;
+            Position position = parsePosition(deviceSession, location);
+
+            if (position.getValid()) {
+                positions.add(position);
+            }
+        });
+
+        if (positions.isEmpty()) {
+            sendResponse(channel, HttpResponseStatus.BAD_REQUEST);
+            return null;
+        }
+
+        sendResponse(channel, HttpResponseStatus.OK);
+        return positions;
+
     }
 
     @Override
@@ -299,3 +337,4 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
     }
 
 }
+

@@ -4,24 +4,102 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.ReadOnlyHttpHeaders;
 import org.junit.jupiter.api.Test;
 import org.traccar.ProtocolTest;
+import org.traccar.helper.DateUtil;
+import org.traccar.model.Position;
+
+import java.io.InputStream;
+import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class OsmAndProtocolDecoderTest extends ProtocolTest {
 
     @Test
-    public void testDecodeJson() throws Exception {
+    public void testDecodeLocationJson() throws Exception {
 
         var decoder = inject(new OsmAndProtocolDecoder(null));
 
-        verifyPosition(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
+        verifyPositions(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
                 "{\"location\":{\"timestamp\":\"2025-06-15T13:45:12.862Z\",\"coords\":{\"latitude\":37.4219983,\"longitude\":-122.084,\"accuracy\":5,\"speed\":0,\"heading\":-1,\"altitude\":5},\"is_moving\":false,\"odometer\":0,\"event\":\"motionchange\",\"battery\":{\"level\":1,\"is_charging\":false},\"activity\":{\"type\":\"still\"},\"extras\":{},\"_\":\"&id=48241179&lat=37.4219983&lon=-122.084&timestamp=2025-06-15T13:45:12.862Z&\"},\"device_id\":\"48241179\"}")));
 
-        verifyPosition(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
+        verifyPositions(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
                 "{\"location\":{\"extras\":{},\"mock\":true,\"coords\":{\"speed_accuracy\":-1,\"speed\":-1,\"longitude\":-122.406417,\"ellipsoidal_altitude\":0,\"floor\":null,\"heading_accuracy\":-1,\"latitude\":37.785834000000001,\"accuracy\":5,\"altitude_accuracy\":-1,\"altitude\":0,\"heading\":-1},\"is_moving\":false,\"age\":188,\"odometer\":0,\"uuid\":\"2FB04C65-99CF-42AB-8DD3-EBCB4B108BF8\",\"event\":\"motionchange\",\"battery\":{\"level\":-1,\"is_charging\":false},\"activity\":{\"type\":\"unknown\",\"confidence\":100},\"timestamp\":\"2025-05-09T04:11:30.579Z\"},\"device_id\":\"658765\"}")));
 
-        verifyPosition(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
+        verifyPositions(decoder, request(HttpMethod.POST, "/", new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"), buffer(
                 "{\"location\":{\"event\":\"motionchange\",\"is_moving\":false,\"uuid\":\"0e9a2473-a9a7-4c00-997b-fb97d2154e75\",\"timestamp\":\"2021-07-21T08:06:34.444Z\",\"odometer\":0,\"coords\":{\"latitude\":-6.1148096,\"longitude\":106.6837015,\"accuracy\":3.8,\"speed\":18.67,\"speed_accuracy\":0.26,\"heading\":63,\"heading_accuracy\":0.28,\"altitude\":35.7,\"altitude_accuracy\":3.8},\"activity\":{\"type\":\"still\",\"confidence\":100},\"battery\":{\"is_charging\":false,\"level\":0.79},\"extras\":{}},\"device_id\":\"8737767034\"}")));
 
     }
+
+    @Test
+    public void testDecodeJsonArray() throws Exception {
+        var decoder = inject(new OsmAndProtocolDecoder(null));
+        String body = """
+                {
+                    "device_id": "658765",
+                    "locations": [
+                        {
+                      "timestamp": "2025-07-13T07:00:00Z",
+                      "coords": {
+                        "latitude": 33.3152,
+                        "longitude": 44.3661,
+                        "accuracy": 12,
+                        "speed": 0,
+                        "heading": 0,
+                        "altitude": 33
+                      },
+                      "is_moving": false,
+                      "odometer": 0,
+                      "battery": { "level": 0.92, "is_charging": false }
+                    },
+                    {
+                      "timestamp": "2025-08-13T07:02:00Z",
+                      "coords": {
+                        "latitude": 33.3160,
+                        "longitude": 44.3669,
+                        "accuracy": 9,
+                        "speed": 1.3,
+                        "heading": 45,
+                        "altitude": 34
+                      },
+                      "is_moving": true,
+                      "odometer": 120,
+                      "battery": { "level": 0.91, "is_charging": false }
+                    }
+                    ]
+                  }
+                """;
+        Position position1 = new Position();
+        position1.setDeviceId(658765);
+        position1.setTime(DateUtil.parseDate("2025-07-13T07:00:00Z"));
+        position1.setLatitude(33.3152);
+        position1.setLongitude(44.3661);
+        position1.setAccuracy(12);
+        position1.setValid(true);
+
+        Position position2 = new Position();
+        position2.setDeviceId(658765);
+        position2.setTime(DateUtil.parseDate("2025-08-13T07:02:00Z"));
+        position2.setLatitude(33.3160);
+        position2.setLongitude(44.3669);
+        position2.setAccuracy(9);
+
+        position2.setValid(true);
+
+        verifyPositions(
+                decoder,
+                true,
+                request(
+                        HttpMethod.POST, "/",
+                        new ReadOnlyHttpHeaders(true, "Content-Type", "application/json"),
+                        buffer(body)),
+                Arrays.asList(position1, position2));
+    }
+
+
+
+
 
     @Test
     public void testDecodeQuery() throws Exception {
@@ -42,13 +120,13 @@ public class OsmAndProtocolDecoderTest extends ProtocolTest {
 
         verifyPosition(decoder, request(
                 "/?lat=49.60688&lon=6.15788&timestamp=2014-06-04+09%3A10%3A11&altitude=384.7&speed=0.0&id=353861053849681"));
-        
+
         verifyPosition(decoder, request(
                 "/?id=123456&timestamp=1377177267&lat=60.0&lon=30.0&speed=0.0&bearing=0.0&altitude=0&hdop=0.0"));
-        
+
         verifyPosition(decoder, request(
                 "/?id=123456&timestamp=1377177267&lat=60.0&lon=30.0"));
-        
+
         verifyPosition(decoder, request(
                 "/?lat=60.0&lon=30.0&speed=0.0&heading=0.0&vacc=0&hacc=0&altitude=0&deviceid=123456"));
 
